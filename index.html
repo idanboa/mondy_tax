@@ -316,7 +316,7 @@
             try {
                 document.getElementById('currentPrice').textContent = 'Loading...';
                 // d1687shr01qvtdbgvgcgd1687shr01qvtdbgvgd0
-                const response = await fetch('https://finnhub.io/api/v1/quote?symbol=MNDY&token=demo');
+                const response = await fetch('https://finnhub.io/api/v1/quote?symbol=MNDY&token=d1687shr01qvtdbgvgcgd1687shr01qvtdbgvgd0');
                 if (response.status === 429) {
                     // Rate limit hit
                     handleRateLimit();
