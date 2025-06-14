@@ -101,6 +101,7 @@
             justify-content: center;
             gap: 12px;
             margin: 24px 0;
+            flex-wrap: wrap;
         }
 
         .currency-btn {
@@ -122,6 +123,30 @@
         .currency-btn.active {
             background: var(--monday-purple);
             color: var(--monday-white);
+        }
+
+        #taxReturnToggle {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--monday-white);
+            color: var(--monday-green);
+            border: 1px solid var(--monday-green);
+            border-radius: 16px;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            height: 32px;
+            transition: background 0.2s, color 0.2s;
+            min-width: 0;
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
+        #taxReturnToggle:hover {
+            background: rgba(0, 202, 114, 0.1);
         }
 
         .total-section {
@@ -181,16 +206,23 @@
         <div class="price-info">
             <div>Current MNDY Price: <span id="currentPrice">Loading...</span></div>
             <div>30-Day Price: <span id="thirtyDayPrice">$104.17</span></div>
+            <div style="margin-top: 10px;">
+                <label for="manualPrice" style="font-size:13px; color:var(--monday-dark);">Manual Stock Price:</label>
+                <input type="number" id="manualPrice" min="0" step="0.01" placeholder="Leave empty for live price" style="width: 100%; padding: 8px; border: 1px solid var(--monday-border); border-radius: 8px; font-size: 14px; margin-top: 4px;">
+            </div>
         </div>
 
         <div class="input-group">
             <label for="stockCount">Number of Stocks to Sell:</label>
             <input type="number" id="stockCount" min="1" value="1">
         </div>
-
-        <div class="currency-switch">
+        <div class="currency-switch" style="flex-wrap: wrap; gap: 8px; align-items: center;">
             <button class="currency-btn active" data-currency="USD">USD</button>
             <button class="currency-btn" data-currency="NIS">NIS</button>
+            <button id="taxReturnToggle" title="Apply 12% Tax Return" style="display: flex; align-items: center; gap: 4px; background: var(--monday-white); color: var(--monday-green); border: 1px solid var(--monday-green); border-radius: 16px; padding: 6px 12px; font-size: 13px; font-family: inherit; font-weight: 500; cursor: pointer; height: 32px; transition: background 0.2s, color 0.2s; min-width: 0; margin-top: 0; margin-bottom: 0;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm1 17.93V20a1 1 0 0 1-2 0v-.07A8.006 8.006 0 0 1 4.07 13H6a1 1 0 0 1 0 2H4.07A8.006 8.006 0 0 1 11 19.93ZM20 13h-1.93A8.006 8.006 0 0 1 13 19.93V20a1 1 0 0 1-2 0v-.07A8.006 8.006 0 0 1 4.07 13H6a1 1 0 0 1 0 2H4.07A8.006 8.006 0 0 1 11 19.93ZM20 11h-1.93A8.006 8.006 0 0 1 13 4.07V4a1 1 0 0 1 2 0v.07A8.006 8.006 0 0 1 19.93 11ZM13 4.07V4a1 1 0 0 1-2 0v.07A8.006 8.006 0 0 1 4.07 11H6a1 1 0 0 1 0 2H4.07A8.006 8.006 0 0 1 11 4.07ZM12 22a10 10 0 1 1 10-10A10.011 10.011 0 0 1 12 22Z"/></svg>
+                <span id="taxReturnToggleText">12% Tax Return</span>
+            </button>
         </div>
 
         <table class="tax-table">
@@ -206,7 +238,7 @@
                 <tr>
                     <td>Income Tax</td>
                     <td id="incomeTaxGain">-</td>
-                    <td>62%</td>
+                    <td id="incomeTaxRate">62%</td>
                     <td id="incomeTaxAmount">-</td>
                 </tr>
                 <tr>
@@ -271,10 +303,12 @@
         let currentPrice = 0;
         let currentCurrency = 'USD';
         let exchangeRate = 3.7; // Default USD to NIS rate
+        let taxReturnApplied = false;
 
         // Elements
         const stockCountInput = document.getElementById('stockCount');
         const currencyButtons = document.querySelectorAll('.currency-btn');
+        const manualPriceInput = document.getElementById('manualPrice');
 
         // Fetch current MNDY stock price using Finnhub
         let rateLimitTimeout = null;
@@ -347,20 +381,19 @@
         // Calculate taxes and values
         function calculate() {
             const stockCount = parseInt(stockCountInput.value) || 0;
-            
+            // Use manual price if provided, else fetched price
+            const priceToUse = manualPriceInput.value ? parseFloat(manualPriceInput.value) : currentPrice;
+            const effectiveIncomeTaxRate = taxReturnApplied ? 0.5 : INCOME_TAX_RATE;
             // Calculate gains
             const incomeTaxGain = THIRTY_DAY_PRICE * stockCount;
-            const capitalTaxGain = (currentPrice - THIRTY_DAY_PRICE) * stockCount;
-            
+            const capitalTaxGain = (priceToUse - THIRTY_DAY_PRICE) * stockCount;
             // Calculate taxes
-            const incomeTax = incomeTaxGain * INCOME_TAX_RATE;
+            const incomeTax = incomeTaxGain * effectiveIncomeTaxRate;
             const capitalTax = capitalTaxGain * CAPITAL_TAX_RATE;
-            
             // Calculate totals
             const totalTax = incomeTax + capitalTax;
-            const totalValue = currentPrice * stockCount;
+            const totalValue = priceToUse * stockCount;
             const netValue = totalValue - totalTax;
-
             // Update UI
             document.getElementById('incomeTaxGain').textContent = formatCurrency(incomeTaxGain, currentCurrency);
             document.getElementById('capitalTaxGain').textContent = formatCurrency(capitalTaxGain, currentCurrency);
@@ -369,6 +402,8 @@
             document.getElementById('totalTax').textContent = formatCurrency(totalTax, currentCurrency);
             document.getElementById('netValue').textContent = formatCurrency(netValue, currentCurrency);
             document.getElementById('thirtyDayPrice').textContent = formatCurrency(THIRTY_DAY_PRICE, currentCurrency);
+            // Update the rate in the table
+            document.getElementById('incomeTaxRate').textContent = (effectiveIncomeTaxRate * 100).toFixed(0) + '%';
         }
 
         // Event Listeners
@@ -382,6 +417,8 @@
                 calculate();
             });
         });
+
+        manualPriceInput.addEventListener('input', calculate);
 
         // Initialize
         fetchStockPrice();
@@ -398,6 +435,16 @@
           tradingviewWidgetContainer.style.display = chartVisible ? '' : 'none';
           toggleChartBtn.querySelector('span').textContent = chartVisible ? 'Hide Stock Chart' : 'Show Stock Chart';
           chevron.style.transform = chartVisible ? 'rotate(180deg)' : 'rotate(0deg)';
+        });
+
+        // Tax return toggle
+        const taxReturnToggle = document.getElementById('taxReturnToggle');
+        taxReturnToggle.addEventListener('click', function() {
+            taxReturnApplied = !taxReturnApplied;
+            taxReturnToggle.style.background = taxReturnApplied ? 'var(--monday-green)' : 'var(--monday-white)';
+            taxReturnToggle.style.color = taxReturnApplied ? 'var(--monday-white)' : 'var(--monday-green)';
+            document.getElementById('taxReturnToggleText').textContent = taxReturnApplied ? '12% Return On' : '12% Tax Return';
+            calculate();
         });
     </script>
 </body>
